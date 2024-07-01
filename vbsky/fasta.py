@@ -17,7 +17,7 @@ from functools import partial
 import jax
 from jax import vmap, grad, jit, value_and_grad
 from jax.flatten_util import ravel_pytree
-from jax.tree_util import tree_map, tree_leaves, tree_flatten, tree_multimap
+from jax.tree_util import tree_map, tree_leaves, tree_flatten
 from jax.example_libraries import optimizers
 
 from Bio import SeqIO, AlignIO, Phylo
@@ -73,14 +73,14 @@ else:
 
 @value_and_grad
 def _loss(p, *args):
-    f1 = loss(p, *args)
+    f1 = loss(p, *args) # is 0
     f2 = ravel_pytree(p)[0]
     return f1  # + jnp.dot(f2, f2)
 
 def get_gisaid_dates(aln):
     dates = []
     for s in aln:
-        desc = s.description.split("|")
+        desc = s.description.split("_")
         date = desc[2]
 
         if date[-5:-3] == "00":
@@ -97,8 +97,8 @@ def get_gisaid_dates(aln):
 def get_gisaid_names(aln):
     names = []
     for s in aln:
-        desc = s.description.split("|")
-        names.append(desc[1])
+        desc = s.description.split("|") # determines what to split by
+        names.append(desc[0]) # was at index 1?
     return names
 
 def get_names(aln):
@@ -386,7 +386,6 @@ class SeqData:
 
     def loop(self, _params_prior_loglik, rng, n_iter=10, step_size=1.0, Q=HKY(2.7), threshold=0.01, dbg=False):
         opt_init, opt_update, get_params = optimizers.adagrad(step_size=step_size)
-
         @partial(jit, static_argnums=(5, 6))
         def step(
             opt_state,
@@ -399,7 +398,7 @@ class SeqData:
             td,
             tip_data_c,
         ):
-            p = get_params(opt_state)
+            p = get_params(opt_state) # p is parameters?
             local_p = get_params(local_opt_state)
             p = p | local_p
 
@@ -419,11 +418,12 @@ class SeqData:
                     _params_prior_loglik,
                 )
                 f_df1 = tree_map(jnp.nan_to_num, f_df1)
-                return tree_multimap(jnp.add, f_df0, f_df1), rng
+                return jax.tree_util.tree_map(jnp.add, f_df0, f_df1), rng
 
             init = ((0.0, tree_map(jnp.zeros_like, p)), rng)
             f_df, rng = jax.lax.fori_loop(0, M, f, init)
-            f, g = tree_map(lambda x: x / M, f_df)
+            f, g = tree_map(lambda x: x / M, f_df) # division here for f? lamda is baby function syntax
+            display(f)
             g = tree_map(jnp.nan_to_num, g)
             global_g = {k: g[k] for k in g if k not in local_names}
             local_g = {k: g[k] for k in g if k in local_names}
@@ -454,7 +454,7 @@ class SeqData:
         br = False
         prev = np.zeros(len(self.tds))
         with tqdm(total=n_iter * len(self.tds)) as pbar:
-            for i in range(n_iter):
+            for i in range(n_iter): # doesn't get to iteration 1
                 for j, (td, tip_data_c) in enumerate(zip(self.tds, self.tip_data_cs)):
                     self.flows = self.global_flows | self.local_flows[j]
                     
@@ -463,13 +463,14 @@ class SeqData:
                         local_opt_state[j],
                         rng,
                         i,
-                        10,
+                        10, # M = 10
                         ((True, True), (True, True, True)),
                         dbg,
                         td,
                         tip_data_c,
                     )
-                    assert np.isfinite(f), f
+                    #display(f)
+                    assert np.isfinite(f), f # must be broken before this, is an array of floats containing only inf
                     if i > 1:
                         prev = np.array([fz[-2] for fz in fs])
                         curr = np.array([fz[-1] for fz in fs])
