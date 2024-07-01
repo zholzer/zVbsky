@@ -4,7 +4,7 @@ from jax import vmap
 from datetime import datetime, timedelta
 
 def plot_helper(res, data, ntips):
-    end = data.end
+    end = data.end # is none
 
     top = (res.global_posteriors["origin"] + res.global_posteriors["origin_start"])[
         :, 0
@@ -47,7 +47,7 @@ def plot_one(res, ax, param, m, start, top, end, x0, label, ci, title):
         y0.append(interp1d(t[1:], y, kind="nearest", bounds_error=False)(x0))
     q25, q50, q75 = np.nanquantile(np.array(y0), q=[0.025, 0.5, 0.975], axis=0)
 
-    color = next(ax._get_lines.prop_cycler)["color"]
+    color = 'red' #next(ax._get_lines.prop_cycler)["color"]
     year = np.floor(x0).astype(int)
     x = year.astype(str).astype("datetime64[Y]") + np.around((x0-year) * 365.245 * 24 * 3600).astype('timedelta64[s]')
     x = x.astype("datetime64[ns]")
